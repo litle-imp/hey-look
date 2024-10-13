@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Anonymous Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #welcome-screen, #generated-code, #enter-details, #chat { display: none; }
+        #messages { list-style-type: none; padding: 0; }
+        #messages li { padding: 8px; margin-bottom: 10px; background-color: #f1f1f1; }
+    </style>
+</head>
+<body>
+    <div id="welcome-screen">
+        <button id="enter-code">Enter Code and Secret Phrase</button>
+        <button id="generate-code">Generate New Code and Secret Phrase</button>
+    </div>
+
+    <div id="generated-code">
+        <p>Your Code: <span id="code"></span></p>
+        <p>Your Secret Phrase: <span id="secret-phrase"></span></p>
+    </div>
+
+    <div id="enter-details">
+        <input type="text" id="input-code" placeholder="Enter Code">
+        <input type="text" id="input-secret-phrase" placeholder="Enter Secret Phrase">
+        <button id="submit-details">Submit</button>
+    </div>
+
+    <div id="chat">
+        <ul id="messages"></ul>
+        <form id="form" action="">
+            <input id="input" autocomplete="off" /><button>Send</button>
+        </form>
+        <button id="logout">Logout</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const generatedCode = document.getElementById('generated-code');
+        const enterDetails = document.getElementById('enter-details');
+        const chat = document.getElementById('chat');
+        const messages = document.getElementById('messages');
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+
+        document.getElementById('generate-code').addEventListener('click', () => {
+            socket.emit('generate code');
+        });
+
+        socket.on('code generated', ({ code, secretPhrase }) => {
+            welcomeScreen.style.display = 'none';
+            generatedCode.style.display = 'block';
+            document.getElementById('code').textContent = code;
+            document.getElementById('secret-phrase').textContent = secretPhrase;
+        });
+
+        document.getElementById('enter-code').addEventListener('click', () => {
+            welcomeScreen.style.display = 'none';
+            enterDetails.style.display = 'block';
+        });
+
+        document.getElementById('submit-details').addEventListener('click', () => {
+            const code = document.getElementById('input-code').value;
+            const secretPhrase = document.getElementById('input-secret-phrase').value;
+            socket.emit('join with code', { code, secretPhrase });
+        });
+
+        socket.on('invalid code', () => {
+            alert('Invalid code or secret phrase');
+        });
+
+        socket.on('connection request', (requestingSocketId) => {
+            if (confirm('Accept connection request?')) {
+                socket.emit('accept connection', requestingSocketId);
+            }
+        });
+
+        socket.on('connection accepted', (targetSocketId) => {
+            enterDetails.style.display = 'none';
+            generatedCode.style.display = 'none';
+            chat.style.display = 'block';
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (input.value) {
+                    socket.emit('chat message', { targetSocketId, message: input.value });
+                    input.value = '';
+                }
+            });
+        });
+
+        socket.on('chat message', (message) => {
+            const item = document.createElement('li');
+            item.textContent = message;
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        document.getElementById('logout').addEventListener('click', () => {
+            socket.disconnect();
+            chat.style.display = 'none';
+            welcomeScreen.style.display = 'block';
+            messages.innerHTML = '';
+        });
+    </script>
+</body>
+</html>
